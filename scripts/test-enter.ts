@@ -18,7 +18,7 @@ async function main() {
   const player1Key = JSON.parse(fs.readFileSync(path.join(walletDir, "player1.json"), "utf-8"));
   const player1 = Keypair.fromSecretKey(Uint8Array.from(player1Key));
 
-  const mints = JSON.parse(fs.readFileSync(path.join(walletDir, "token-mints-admin.json"), "utf-8"));
+  const mints = JSON.parse(fs.readFileSync(path.join(walletDir, "token-mints.json"), "utf-8"));
   const mint = new PublicKey(mints["0"]); // SOL token
 
   const [globalStatePda] = PublicKey.findProgramAddressSync(

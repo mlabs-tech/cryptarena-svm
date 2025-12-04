@@ -154,7 +154,7 @@ async function main() {
 
   // Load or create token mints
   const walletDir = path.join(__dirname, "../test-wallets");
-  const mintsFilePath = path.join(walletDir, "token-mints-admin.json");
+  const mintsFilePath = path.join(walletDir, "token-mints.json");
 
   if (!fs.existsSync(walletDir)) {
     fs.mkdirSync(walletDir, { recursive: true });

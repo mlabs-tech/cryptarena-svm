@@ -122,7 +122,7 @@ async function main() {
   console.log("");
 
   // Load token mints
-  const mintsFilePath = path.join(walletDir, "token-mints-admin.json");
+  const mintsFilePath = path.join(walletDir, "token-mints.json");
   const tokenMints: { [key: number]: PublicKey } = {};
   
   if (fs.existsSync(mintsFilePath)) {

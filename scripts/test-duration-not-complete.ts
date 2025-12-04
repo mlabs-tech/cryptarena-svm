@@ -105,7 +105,7 @@ async function main() {
   console.log(`   Admin: ${admin.publicKey.toString()}`);
 
   const walletDir = path.join(__dirname, "../test-wallets");
-  const mintsFilePath = path.join(walletDir, "token-mints-admin.json");
+  const mintsFilePath = path.join(walletDir, "token-mints.json");
   const tokenMints: { [key: number]: PublicKey } = {};
   const existingMints = JSON.parse(fs.readFileSync(mintsFilePath, "utf-8"));
   for (const [key, value] of Object.entries(existingMints)) {

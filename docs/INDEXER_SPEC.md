@@ -102,7 +102,7 @@ This document specifies the indexer service for the Cryptarena SVM protocol. The
 
 | Index | Symbol | Name | Mint Address (Devnet) |
 |-------|--------|------|----------------------|
-| 0 | SOL | Solana | (from token-mints-admin.json) |
+| 0 | SOL | Solana | (from token-mints.json) |
 | 1 | TRUMP | Trump | |
 | 2 | PUMP | Pump | |
 | 3 | BONK | Bonk | |
