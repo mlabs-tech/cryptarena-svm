@@ -1,0 +1,47 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Anchor
+.anchor/
+test-ledger/
+
+# Node.js (for Anchor tests and scripts)
+node_modules/
+dist/
+.yarn/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test wallets - KEEP ONLY FOR LOCAL DEVELOPMENT
+# Uncomment if you want to track test wallets
+# !test-wallets/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts that shouldn't be committed
+*.so
+
+# Keep IDL and deploy keypairs (these are needed)
+!target/idl/
+!target/deploy/*.json
+!target/types/

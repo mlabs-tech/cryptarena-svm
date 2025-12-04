@@ -1,0 +1,22 @@
+[package]
+name = "cryptarena-svm"
+version = "0.1.0"
+description = "Cryptarena - On-chain crypto trading arena protocol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cryptarena_svm"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+anchor-spl = "0.32.1"
+pyth-solana-receiver-sdk = "1.1.0"
