@@ -70,6 +70,58 @@ pub mod cryptarena_svm_test {
         Ok(())
     }
 
+    /// Update arena duration (admin only)
+    pub fn update_arena_duration(
+        ctx: Context<AdminOnly>,
+        arena_duration: i64,
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.admin.key() == ctx.accounts.global_state.admin,
+            CryptarenaError::Unauthorized
+        );
+        require!(
+            arena_duration > 0,
+            CryptarenaError::InvalidDuration
+        );
+        ctx.accounts.global_state.arena_duration = arena_duration;
+        msg!("Arena duration updated to {} seconds", arena_duration);
+        Ok(())
+    }
+
+    /// Add token to whitelist (admin only)
+    pub fn add_whitelisted_token(
+        ctx: Context<AddWhitelistedToken>,
+        asset_index: u8,
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.admin.key() == ctx.accounts.global_state.admin,
+            CryptarenaError::Unauthorized
+        );
+        
+        let whitelisted_token = &mut ctx.accounts.whitelisted_token;
+        whitelisted_token.mint = ctx.accounts.token_mint.key();
+        whitelisted_token.asset_index = asset_index;
+        whitelisted_token.is_active = true;
+        whitelisted_token.bump = ctx.bumps.whitelisted_token;
+        
+        msg!("Token {} whitelisted at index {}", ctx.accounts.token_mint.key(), asset_index);
+        Ok(())
+    }
+
+    /// Remove token from whitelist (admin only)
+    pub fn remove_whitelisted_token(
+        ctx: Context<RemoveWhitelistedToken>,
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.admin.key() == ctx.accounts.global_state.admin,
+            CryptarenaError::Unauthorized
+        );
+        
+        ctx.accounts.whitelisted_token.is_active = false;
+        msg!("Token {} removed from whitelist", ctx.accounts.whitelisted_token.mint);
+        Ok(())
+    }
+
     /// Enter arena with tokens
     pub fn enter_arena(
         ctx: Context<EnterArena>,
@@ -97,6 +149,17 @@ pub mod cryptarena_svm_test {
         require!(
             arena.status == ArenaStatus::Waiting as u8,
             CryptarenaError::ArenaNotWaiting
+        );
+
+        // Check token is whitelisted
+        let whitelisted_token = &ctx.accounts.whitelisted_token;
+        require!(
+            whitelisted_token.is_active,
+            CryptarenaError::TokenNotWhitelisted
+        );
+        require!(
+            whitelisted_token.asset_index == asset_index,
+            CryptarenaError::InvalidAssetIndex
         );
 
         // Initialize or update arena asset
@@ -128,6 +191,7 @@ pub mod cryptarena_svm_test {
         player_entry.player_index = arena.player_count;
         player_entry.is_winner = false;
         player_entry.own_tokens_claimed = false;
+        player_entry.treasury_fee_claimed = false;
         player_entry.rewards_claimed_bitmap = 0;
         player_entry.bump = ctx.bumps.player_entry;
 
@@ -361,7 +425,7 @@ pub mod cryptarena_svm_test {
         Ok(())
     }
 
-    /// Winner claims tokens from a loser (90% winner, 10% treasury)
+    /// Winner claims tokens from a loser (90% only - treasury claims separately)
     pub fn claim_loser_tokens(ctx: Context<ClaimLoserTokens>) -> Result<()> {
         let arena = &ctx.accounts.arena;
         let winner_entry = &mut ctx.accounts.winner_entry;
@@ -391,19 +455,20 @@ pub mod cryptarena_svm_test {
             CryptarenaError::RewardAlreadyClaimed
         );
 
-        // Calculate amounts: split among winners, then 90/10 split
-        let winner_count = arena_asset.player_count as u64; // Winners for this asset
+        // Calculate winner's share: 90% of (loser_amount / winner_count)
+        let winner_count = arena_asset.player_count as u64;
         let loser_amount = loser_entry.amount;
         let amount_per_winner = loser_amount / winner_count.max(1);
         
+        // Winner gets 90% (10% stays in vault for treasury)
         let treasury_fee = (amount_per_winner * TREASURY_FEE_BPS) / 10000;
         let winner_reward = amount_per_winner - treasury_fee;
 
-        // Transfer to winner
         let arena_id_bytes = arena.id.to_le_bytes();
         let seeds = &[b"arena_v2".as_ref(), arena_id_bytes.as_ref(), &[arena.bump]];
         let signer = &[&seeds[..]];
 
+        // Transfer 90% to winner (10% stays in arena vault for treasury)
         let transfer_to_winner = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
@@ -415,8 +480,51 @@ pub mod cryptarena_svm_test {
         );
         token::transfer(transfer_to_winner, winner_reward)?;
 
-        // Transfer to treasury
-        let transfer_to_treasury = CpiContext::new_with_signer(
+        // Mark as claimed by this winner
+        winner_entry.rewards_claimed_bitmap |= loser_bit;
+        winner_entry.is_winner = true;
+
+        msg!("Winner claimed {} from loser {} (treasury fee {} in vault)", 
+            winner_reward, loser_entry.player_index, treasury_fee);
+        Ok(())
+    }
+
+    /// Admin collects treasury fee from a loser (10%) - INDEPENDENT of winner claims
+    pub fn collect_treasury_fee(ctx: Context<CollectTreasuryFee>) -> Result<()> {
+        require!(
+            ctx.accounts.admin.key() == ctx.accounts.global_state.admin,
+            CryptarenaError::Unauthorized
+        );
+
+        let arena = &ctx.accounts.arena;
+        let loser_entry = &mut ctx.accounts.loser_entry;
+
+        require!(
+            arena.status == ArenaStatus::Ended as u8,
+            CryptarenaError::ArenaNotEnded
+        );
+
+        // Check loser is actually a loser
+        require!(
+            loser_entry.asset_index != arena.winning_asset,
+            CryptarenaError::CannotClaimFromWinner
+        );
+
+        // Check treasury hasn't already claimed from this loser
+        require!(
+            !loser_entry.treasury_fee_claimed,
+            CryptarenaError::TreasuryFeeAlreadyClaimed
+        );
+
+        // Calculate treasury fee (10% of loser's tokens)
+        let treasury_fee = (loser_entry.amount * TREASURY_FEE_BPS) / 10000;
+
+        let arena_id_bytes = arena.id.to_le_bytes();
+        let seeds = &[b"arena_v2".as_ref(), arena_id_bytes.as_ref(), &[arena.bump]];
+        let signer = &[&seeds[..]];
+
+        // Transfer 10% from arena vault to treasury token account
+        let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.arena_vault.to_account_info(),
@@ -425,14 +533,12 @@ pub mod cryptarena_svm_test {
             },
             signer,
         );
-        token::transfer(transfer_to_treasury, treasury_fee)?;
+        token::transfer(transfer_ctx, treasury_fee)?;
 
-        // Mark as claimed
-        winner_entry.rewards_claimed_bitmap |= loser_bit;
-        winner_entry.is_winner = true;
+        // Mark treasury fee as claimed for this loser
+        loser_entry.treasury_fee_claimed = true;
 
-        msg!("Claimed {} from loser {} (treasury: {})", 
-            winner_reward, loser_entry.player_index, treasury_fee);
+        msg!("Treasury collected {} from loser {}", treasury_fee, loser_entry.player_index);
         Ok(())
     }
 }
@@ -465,6 +571,45 @@ pub struct Initialize<'info> {
 pub struct AdminOnly<'info> {
     #[account(mut, seeds = [b"global_state_v2"], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
+
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(asset_index: u8)]
+pub struct AddWhitelistedToken<'info> {
+    #[account(seeds = [b"global_state_v2"], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + WhitelistedToken::INIT_SPACE,
+        seeds = [b"whitelist_token_v2", token_mint.key().as_ref()],
+        bump
+    )]
+    pub whitelisted_token: Account<'info, WhitelistedToken>,
+
+    /// CHECK: Token mint address
+    pub token_mint: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RemoveWhitelistedToken<'info> {
+    #[account(seeds = [b"global_state_v2"], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(
+        mut,
+        seeds = [b"whitelist_token_v2", whitelisted_token.mint.as_ref()],
+        bump = whitelisted_token.bump
+    )]
+    pub whitelisted_token: Account<'info, WhitelistedToken>,
 
     pub admin: Signer<'info>,
 }
@@ -507,6 +652,13 @@ pub struct EnterArena<'info> {
 
     #[account(mut)]
     pub arena_vault: Account<'info, TokenAccount>,
+
+    /// Whitelisted token account
+    #[account(
+        seeds = [b"whitelist_token_v2", player_token_account.mint.as_ref()],
+        bump = whitelisted_token.bump
+    )]
+    pub whitelisted_token: Account<'info, WhitelistedToken>,
 
     #[account(mut)]
     pub player: Signer<'info>,
@@ -603,10 +755,36 @@ pub struct ClaimLoserTokens<'info> {
     #[account(mut)]
     pub winner_token_account: Account<'info, TokenAccount>,
 
+    pub winner: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct CollectTreasuryFee<'info> {
+    #[account(seeds = [b"global_state_v2"], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(seeds = [b"arena_v2", arena.id.to_le_bytes().as_ref()], bump = arena.bump)]
+    pub arena: Account<'info, Arena>,
+
+    /// Loser's player entry
+    #[account(
+        mut,
+        seeds = [b"player_entry_v2", arena.key().as_ref(), loser_entry.player.as_ref()],
+        bump = loser_entry.bump,
+    )]
+    pub loser_entry: Account<'info, PlayerEntry>,
+
+    #[account(mut)]
+    pub arena_vault: Account<'info, TokenAccount>,
+
+    /// Admin/Treasury's token account to receive the fee
     #[account(mut)]
     pub treasury_token_account: Account<'info, TokenAccount>,
 
-    pub winner: Signer<'info>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -672,9 +850,21 @@ pub struct PlayerEntry {
     pub entry_timestamp: i64,
     pub is_winner: bool,
     pub own_tokens_claimed: bool,
+    pub treasury_fee_claimed: bool, // True when admin collected 10% from this loser
     pub rewards_claimed_bitmap: u128, // Supports up to 128 players
     pub bump: u8,
 }
+
+/// WhitelistedToken - Tokens allowed to enter arenas (~50 bytes)
+#[account]
+#[derive(InitSpace)]
+pub struct WhitelistedToken {
+    pub mint: Pubkey,
+    pub asset_index: u8,
+    pub is_active: bool,
+    pub bump: u8,
+}
+
 
 // ============================================================================
 // ENUMS & ERRORS
@@ -722,4 +912,12 @@ pub enum CryptarenaError {
     ArenaNotEnding,
     #[msg("Cannot claim from another winner")]
     CannotClaimFromWinner,
+    #[msg("Invalid duration - must be greater than 0")]
+    InvalidDuration,
+    #[msg("Token is not whitelisted")]
+    TokenNotWhitelisted,
+    #[msg("Asset index does not match whitelisted token")]
+    InvalidAssetIndex,
+    #[msg("Treasury fee already claimed from this loser")]
+    TreasuryFeeAlreadyClaimed,
 }

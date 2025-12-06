@@ -36,7 +36,7 @@ function loadKeypair(filePath: string): Keypair {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY"];
+const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
 // ============================================================================
 // MAIN TEST

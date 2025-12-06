@@ -23,7 +23,7 @@ async function main() {
 
   // Load token mints
   const mints = JSON.parse(fs.readFileSync(path.join(walletDir, "token-mints.json"), "utf-8"));
-  const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY"];
+  const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
   console.log("👤 WINNER INFO");
   console.log("─".repeat(70));

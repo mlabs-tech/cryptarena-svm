@@ -21,6 +21,8 @@ import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   getAccount,
+  getOrCreateAssociatedTokenAccount,
+  mintTo,
 } from "@solana/spl-token";
 import * as fs from "fs";
 import * as path from "path";
@@ -100,6 +102,55 @@ async function fetchPrices(symbols: string[]): Promise<{ [key: string]: number }
 
 function priceToOnchain(price: number): anchor.BN {
   return new anchor.BN(Math.floor(price * 1e8));
+}
+
+async function airdropTokens(
+  connection: Connection,
+  admin: Keypair,
+  recipient: PublicKey,
+  mint: PublicKey,
+  assetName: string,
+  targetUSD: number,
+  currentPrice: number,
+  decimals: number
+): Promise<boolean> {
+  try {
+    console.log(`   💸 Airdropping $${targetUSD} worth of ${assetName}...`);
+    
+    // Get or create ATA
+    const ata = await getOrCreateAssociatedTokenAccount(
+      connection,
+      admin,
+      mint,
+      recipient
+    );
+
+    // Calculate amount with decimals to reach target USD value
+    const tokensNeeded = (targetUSD / currentPrice) * Math.pow(10, decimals);
+    const amountWithDecimals = BigInt(Math.floor(tokensNeeded));
+
+    // Mint tokens
+    await mintTo(
+      connection,
+      admin,
+      mint,
+      ata.address,
+      admin, // admin is mint authority
+      amountWithDecimals
+    );
+
+    // Get new balance
+    const accountInfo = await getAccount(connection, ata.address);
+    const balance = Number(accountInfo.amount) / Math.pow(10, decimals);
+
+    console.log(`   ✅ Airdropped ${(tokensNeeded / Math.pow(10, decimals)).toFixed(9)} ${assetName}`);
+    console.log(`   💰 New balance: ${balance.toLocaleString()} ${assetName} ≈ $${(balance * currentPrice).toFixed(2)}`);
+
+    return true;
+  } catch (error: any) {
+    console.log(`   ❌ Airdrop failed: ${error.message?.slice(0, 80) || error}`);
+    return false;
+  }
 }
 
 // ============================================================================
@@ -231,7 +282,16 @@ async function main() {
     console.log(`ADDING ${playersNeeded} PLAYERS TO FILL ARENA`);
     console.log("─".repeat(70) + "\n");
 
-    const USD_ENTRY = new anchor.BN(15_000_000); // $15
+    const USD_ENTRY = new anchor.BN(10_000_000); // $10
+    
+    // Fetch current prices from CoinMarketCap
+    console.log("📡 Fetching current prices from CoinMarketCap...\n");
+    const currentPrices = await fetchPrices(ASSET_NAMES);
+    
+    if (Object.keys(currentPrices).length === 0) {
+      console.log("❌ Failed to fetch prices. Cannot calculate proper entry amounts.");
+      return;
+    }
     
     // Available assets for new players (avoid assets with 3+ players)
     const availableAssets = ASSET_NAMES.map((_, i) => i).filter(i => !existingAssets.has(i));
@@ -265,17 +325,19 @@ async function main() {
       const playerAta = await getAssociatedTokenAddress(mint, player.publicKey);
       
       let tokenBalance = BigInt(0);
+      let needsAirdrop = false;
+      
       try {
         const tokenAccount = await getAccount(connection, playerAta);
         tokenBalance = tokenAccount.amount;
       } catch {
-        console.log(`   ⚠️ Player ${player.publicKey.toString().slice(0, 8)}... has no ${assetName}, skipping`);
-        continue;
+        console.log(`   ⚠️ Player ${player.publicKey.toString().slice(0, 8)}... has no ${assetName}`);
+        needsAirdrop = true;
       }
 
-      if (tokenBalance === BigInt(0)) {
-        console.log(`   ⚠️ Player has 0 ${assetName}, skipping`);
-        continue;
+      if (tokenBalance === BigInt(0) && !needsAirdrop) {
+        console.log(`   ⚠️ Player has 0 ${assetName}`);
+        needsAirdrop = true;
       }
 
       console.log(`👤 Adding player with ${assetName}...`);
@@ -293,8 +355,57 @@ async function main() {
           program.programId
         );
 
-        // Use 10% of balance or enough for $15, whichever is smaller
-        const tokenAmount = new anchor.BN(Number(tokenBalance) / 10);
+        const [whitelistedTokenPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("whitelist_token_v2"), mint.toBuffer()],
+          program.programId
+        );
+
+        // Calculate token amount based on current price to equal $10 USD
+        const currentPrice = currentPrices[assetName] || 1;
+        const targetUSD = 10; // $10 entry value
+        const decimals = 9; // Most SPL tokens use 9 decimals
+        const tokenAmountForTargetUSD = (targetUSD / currentPrice) * Math.pow(10, decimals);
+        const tokenAmount = new anchor.BN(Math.floor(tokenAmountForTargetUSD));
+        
+        console.log(`   💰 ${assetName} price: $${currentPrice.toFixed(6)}`);
+        console.log(`   📊 Entering with ${(tokenAmountForTargetUSD / Math.pow(10, decimals)).toFixed(9)} ${assetName} ≈ $${targetUSD}`);
+        
+        // Check if player has enough tokens, if not airdrop $5000 worth
+        if (needsAirdrop || tokenBalance < BigInt(tokenAmount.toString())) {
+          console.log(`   ⚠️ Insufficient balance. Has: ${Number(tokenBalance) / Math.pow(10, decimals)} ${assetName}, needs: ${tokenAmountForTargetUSD / Math.pow(10, decimals)} ${assetName}`);
+          
+          // Airdrop $5000 worth of the token
+          const airdropSuccess = await airdropTokens(
+            connection,
+            admin,
+            player.publicKey,
+            mint,
+            assetName,
+            5000, // $5000 target
+            currentPrice,
+            decimals
+          );
+          
+          if (!airdropSuccess) {
+            console.log(`   ⚠️ Failed to airdrop tokens, skipping player`);
+            continue;
+          }
+          
+          // Refresh token balance after airdrop
+          try {
+            const tokenAccount = await getAccount(connection, playerAta);
+            tokenBalance = tokenAccount.amount;
+          } catch {
+            console.log(`   ⚠️ Failed to get balance after airdrop, skipping player`);
+            continue;
+          }
+          
+          // Verify we now have enough
+          if (tokenBalance < BigInt(tokenAmount.toString())) {
+            console.log(`   ⚠️ Still insufficient balance after airdrop, skipping player`);
+            continue;
+          }
+        }
 
         const tx = new Transaction();
         
@@ -314,6 +425,7 @@ async function main() {
             playerEntry: playerEntryPda,
             playerTokenAccount: playerAta,
             arenaVault: arenaVault,
+            whitelistedToken: whitelistedTokenPda,
             player: player.publicKey,
             tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
@@ -342,69 +454,9 @@ async function main() {
   arena = await program.account.arena.fetch(arenaPda);
   console.log(`\n📊 Arena Status: ${ARENA_STATUS[arena.status]} | Players: ${arena.playerCount}/10`);
 
-  // ================================================================
-  // SET START PRICES IF READY
-  // ================================================================
   if (arena.status === 2) { // Ready
-    console.log("\n" + "─".repeat(70));
-    console.log("🏁 ARENA READY! Setting start prices...");
-    console.log("─".repeat(70) + "\n");
-
-    // Get assets in arena
-    const assetsInArena: number[] = [];
-    for (let i = 0; i < 14; i++) {
-      const [assetPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("arena_asset_v2"), arenaPda.toBuffer(), Buffer.from([i])],
-        program.programId
-      );
-      
-      try {
-        const assetData = await program.account.arenaAsset.fetch(assetPda);
-        if (assetData.playerCount > 0) {
-          assetsInArena.push(i);
-          arenaAssetPdas[i] = assetPda;
-        }
-      } catch {}
-    }
-
-    console.log(`📊 Assets in arena: ${assetsInArena.map(i => ASSET_NAMES[i]).join(", ")}`);
-    console.log("📡 Fetching live prices from CoinMarketCap...\n");
-
-    const prices = await fetchPrices(ASSET_NAMES);
-
-    for (const assetIndex of assetsInArena) {
-      const assetName = ASSET_NAMES[assetIndex];
-      const price = prices[assetName] || 1;
-      const onchainPrice = priceToOnchain(price);
-      
-      try {
-        await program.methods
-          .setStartPrice(onchainPrice)
-          .accountsStrict({
-            globalState: globalStatePda,
-            arena: arenaPda,
-            arenaAsset: arenaAssetPdas[assetIndex],
-            admin: admin.publicKey,
-          })
-          .signers([admin])
-          .rpc();
-        
-        console.log(`   ✅ ${assetName.padEnd(10)}: $${price.toFixed(6)}`);
-      } catch (error: any) {
-        console.log(`   ⚠️ ${assetName}: ${error.message?.slice(0, 50)}`);
-      }
-      await sleep(500);
-    }
-
-    // Final status
-    arena = await program.account.arena.fetch(arenaPda);
-    console.log(`\n📊 Final Status: ${ARENA_STATUS[arena.status]}`);
-    
-    if (arena.status === 3) {
-      const endTime = new Date(arena.endTimestamp.toNumber() * 1000);
-      console.log(`⏱️  Arena ends at: ${endTime.toLocaleTimeString()}`);
-      console.log(`   Duration: ${globalState.arenaDuration.toNumber()} seconds`);
-    }
+    console.log("\n🏁 Arena is READY with 10 players!");
+    console.log("💡 The indexer will automatically start it and set prices.");
   }
 
   console.log("\n" + "═".repeat(70));

@@ -37,7 +37,7 @@ import https from "https";
 // ============================================================================
 
 const CMC_API_KEY = "ef3cc5e80cc848ceba20b3c7cba60d5d";
-const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY"];
+const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
 // FARTCOIN index = 8, this will be our winning token
 const WINNING_ASSET_INDEX = 8;

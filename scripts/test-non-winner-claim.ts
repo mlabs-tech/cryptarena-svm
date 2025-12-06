@@ -30,7 +30,7 @@ function loadKeypair(filePath: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(secretKey));
 }
 
-const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY"];
+const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
 const ARENA_STATUS: { [key: number]: string } = {
   0: "Uninitialized", 1: "Waiting", 2: "Ready", 3: "Active",
