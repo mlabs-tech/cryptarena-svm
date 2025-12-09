@@ -363,14 +363,18 @@ pub mod cryptarena_sol {
 
         player_entry.end_price = price;
         
-        // Calculate price movement (basis points)
+        // Calculate price movement with 8 decimal precision (10^8 multiplier)
+        // This gives us 0.00000001% precision instead of 0.01% (basis points)
+        // Use i128 for intermediate calculation to avoid overflow
         if player_entry.start_price > 0 {
-            let start = player_entry.start_price as i64;
-            let end = price as i64;
-            player_entry.price_movement = ((end - start) * 10000) / start;
+            let start = player_entry.start_price as i128;
+            let end = price as i128;
+            // Multiplier: 10^8 for 8 decimal places (e.g., 83790000 = 0.8379%)
+            let movement = ((end - start) * 100_000_000) / start;
+            player_entry.price_movement = movement as i64;
         }
 
-        msg!("Player {} token {} end price: {} | Movement: {}bps", 
+        msg!("Player {} token {} end price: {} | Movement: {} (8 decimals)", 
             player_entry.player_index, player_entry.asset_index, 
             price, player_entry.price_movement);
 
@@ -438,7 +442,7 @@ pub mod cryptarena_sol {
                 if start_price > 0 && end_price > 0 {
                     prices_set_count += 1;
                     
-                    msg!("Player token {} movement: {}bps", asset_index, movement);
+                    msg!("Player token {} movement: {} (8 decimals)", asset_index, movement);
 
                     if movement > best_movement {
                         best_movement = movement;
@@ -468,7 +472,7 @@ pub mod cryptarena_sol {
         arena.winning_asset = winning_asset;
         arena.status = ArenaStatus::Ended as u8;
 
-        msg!("Arena {} ENDED! Winner token: {} with {}bps", 
+        msg!("Arena {} ENDED! Winner token: {} with {} (8 decimals)", 
             arena.id, winning_asset, best_movement);
         Ok(())
     }
