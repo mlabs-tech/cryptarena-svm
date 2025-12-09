@@ -477,7 +477,7 @@ pub mod cryptarena_sol {
         Ok(())
     }
 
-    /// Winner claims rewards (90% of total pool)
+    /// Winner claims rewards (100% for single-player arenas, 90% for multi-player arenas)
     pub fn claim_winner_rewards(ctx: Context<ClaimWinnerRewards>) -> Result<()> {
         let arena = &ctx.accounts.arena;
         let player_entry = &mut ctx.accounts.player_entry;
@@ -497,9 +497,15 @@ pub mod cryptarena_sol {
             CryptarenaError::RewardAlreadyClaimed
         );
 
-        // Calculate winner's reward (90% of total pool)
+        // Calculate winner's reward
+        // If only 1 player, winner gets 100% of pool. Otherwise, 90% (normal split)
         let total_pool = arena.total_pool;
-        let winner_reward = (total_pool * WINNER_SHARE_BPS) / 10000;
+        let winner_share_bps = if arena.player_count == 1 {
+            10000 // 100% for single player arenas
+        } else {
+            WINNER_SHARE_BPS // 90% for multi-player arenas
+        };
+        let winner_reward = (total_pool * winner_share_bps) / 10000;
 
         // Transfer SOL from arena vault to winner
         **ctx.accounts.arena_vault.to_account_info().try_borrow_mut_lamports()? -= winner_reward;
@@ -508,11 +514,15 @@ pub mod cryptarena_sol {
         player_entry.is_winner = true;
         player_entry.has_claimed = true;
 
-        msg!("Winner claimed {} lamports ({} SOL)", winner_reward, winner_reward as f64 / 1_000_000_000.0);
+        if arena.player_count == 1 {
+            msg!("Single player winner claimed {} lamports ({} SOL) - 100% of pool", winner_reward, winner_reward as f64 / 1_000_000_000.0);
+        } else {
+            msg!("Winner claimed {} lamports ({} SOL) - 90% of pool", winner_reward, winner_reward as f64 / 1_000_000_000.0);
+        }
         Ok(())
     }
 
-    /// Admin claims treasury fee (10% of total pool)
+    /// Admin claims treasury fee (10% of total pool, 0% for single-player arenas)
     pub fn claim_treasury_fee(ctx: Context<ClaimTreasuryFee>) -> Result<()> {
         require!(
             ctx.accounts.admin.key() == ctx.accounts.global_state.admin,
@@ -531,17 +541,27 @@ pub mod cryptarena_sol {
             CryptarenaError::TreasuryFeeAlreadyClaimed
         );
 
-        // Calculate treasury fee (10% of total pool)
+        // Calculate treasury fee
+        // For single-player arenas, treasury gets 0% (winner gets 100%)
+        // For multi-player arenas, treasury gets 10%
         let total_pool = arena.total_pool;
-        let treasury_fee = (total_pool * TREASURY_FEE_BPS) / 10000;
+        let treasury_fee = if arena.player_count == 1 {
+            0 // No treasury fee for single-player arenas
+        } else {
+            (total_pool * TREASURY_FEE_BPS) / 10000
+        };
 
-        // Transfer SOL from arena vault to treasury
-        **ctx.accounts.arena_vault.to_account_info().try_borrow_mut_lamports()? -= treasury_fee;
-        **ctx.accounts.treasury_wallet.to_account_info().try_borrow_mut_lamports()? += treasury_fee;
+        // Only transfer if there's a fee to claim
+        if treasury_fee > 0 {
+            // Transfer SOL from arena vault to treasury
+            **ctx.accounts.arena_vault.to_account_info().try_borrow_mut_lamports()? -= treasury_fee;
+            **ctx.accounts.treasury_wallet.to_account_info().try_borrow_mut_lamports()? += treasury_fee;
+            msg!("Treasury claimed {} lamports ({} SOL)", treasury_fee, treasury_fee as f64 / 1_000_000_000.0);
+        } else {
+            msg!("Treasury fee is 0 for single-player arena - nothing to claim");
+        }
 
         arena.treasury_claimed = true;
-
-        msg!("Treasury claimed {} lamports ({} SOL)", treasury_fee, treasury_fee as f64 / 1_000_000_000.0);
         Ok(())
     }
 
