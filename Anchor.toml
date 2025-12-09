@@ -9,11 +9,13 @@ skip-lint = false
 cryptarena_svm = "GjiVESbCveUyk2c1zqbFCzPnuficii3L5ZJHgYHMRhg6"
 cryptarena_faucet = "9ZaAhicfWbLmdJUzXk2ZT1o5CTdaW6VE8mF9sju15D5E"
 cryptarena_svm_test = "2LsREShXRB5GMera37czrEKwe5xt9FUnKAjwpW183ce9"
+cryptarena_sol = "GX4gVWUtVgq6XxL8oHYy6psoN9KFdJhwnds2T3NHe5na"
 
 [programs.devnet]
 cryptarena_svm = "GjiVESbCveUyk2c1zqbFCzPnuficii3L5ZJHgYHMRhg6"
 cryptarena_faucet = "9ZaAhicfWbLmdJUzXk2ZT1o5CTdaW6VE8mF9sju15D5E"
 cryptarena_svm_test = "2LsREShXRB5GMera37czrEKwe5xt9FUnKAjwpW183ce9"
+cryptarena_sol = "GX4gVWUtVgq6XxL8oHYy6psoN9KFdJhwnds2T3NHe5na"
 
 [registry]
 url = "https://api.apr.dev"
