@@ -363,18 +363,18 @@ pub mod cryptarena_sol {
 
         player_entry.end_price = price;
         
-        // Calculate price movement with 8 decimal precision (10^8 multiplier)
-        // This gives us 0.00000001% precision instead of 0.01% (basis points)
+        // Calculate price movement with 12 decimal precision (10^12 multiplier)
+        // This gives us 0.000000000001% precision, essential for very small price tokens (PEPE, SHIB, etc.)
         // Use i128 for intermediate calculation to avoid overflow
         if player_entry.start_price > 0 {
             let start = player_entry.start_price as i128;
             let end = price as i128;
-            // Multiplier: 10^8 for 8 decimal places (e.g., 83790000 = 0.8379%)
-            let movement = ((end - start) * 100_000_000) / start;
+            // Multiplier: 10^12 for 12 decimal places (e.g., 837900000000 = 0.8379%)
+            let movement = ((end - start) * 1_000_000_000_000) / start;
             player_entry.price_movement = movement as i64;
         }
 
-        msg!("Player {} token {} end price: {} | Movement: {} (8 decimals)", 
+        msg!("Player {} token {} end price: {} | Movement: {} (12 decimals)", 
             player_entry.player_index, player_entry.asset_index, 
             price, player_entry.price_movement);
 
@@ -442,7 +442,7 @@ pub mod cryptarena_sol {
                 if start_price > 0 && end_price > 0 {
                     prices_set_count += 1;
                     
-                    msg!("Player token {} movement: {} (8 decimals)", asset_index, movement);
+                    msg!("Player token {} movement: {} (12 decimals)", asset_index, movement);
 
                     if movement > best_movement {
                         best_movement = movement;
