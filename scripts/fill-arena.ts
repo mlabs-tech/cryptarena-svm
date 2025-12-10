@@ -51,7 +51,7 @@ function setupProvider(): { provider: AnchorProvider; admin: Keypair } {
 // CONFIGURATION
 // ============================================================================
 
-const CMC_API_KEY = "5f98fdb0-3b70-4456-897a-d99a61fca066";
+const CMC_API_KEY = process.env.CMC_API_KEY || "";
 const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
 const ARENA_STATUS: { [key: number]: string } = {

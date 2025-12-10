@@ -20,7 +20,7 @@ const idlPath = path.join(__dirname, "../target/idl/cryptarena_svm_test.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 // Config
-const RPC_URL = "https://devnet.helius-rpc.com/?api-key=aef82c1e-d2b4-4c37-90c9-7bb84228d5cf";
+const RPC_URL = process.env.HELIUS_RPC_URL || "https://api.devnet.solana.com";
 const PROGRAM_ID = new PublicKey("2LsREShXRB5GMera37czrEKwe5xt9FUnKAjwpW183ce9");
 
 // Token mints

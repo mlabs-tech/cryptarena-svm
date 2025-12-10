@@ -34,7 +34,7 @@ const RPC_URL = process.env.ANCHOR_PROVIDER_URL || "https://api.devnet.solana.co
 const WALLET_PATH = process.env.ANCHOR_WALLET || path.join(os.homedir(), ".config/solana/id.json");
 const PROGRAM_ID = new PublicKey("GX4gVWUtVgq6XxL8oHYy6psoN9KFdJhwnds2T3NHe5na");
 
-const CMC_API_KEY = "ef3cc5e80cc848ceba20b3c7cba60d5d";
+const CMC_API_KEY = process.env.CMC_API_KEY || "";
 
 // Token symbols for the 10 players (matching whitelist indices 0-9)
 // Using symbols that CoinMarketCap API recognizes

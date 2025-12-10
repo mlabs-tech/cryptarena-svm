@@ -28,9 +28,8 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Test wallets - KEEP ONLY FOR LOCAL DEVELOPMENT
-# Uncomment if you want to track test wallets
-# !test-wallets/
+# Test wallets - PRIVATE KEYS, never commit!
+test-wallets/
 
 # Logs
 *.log

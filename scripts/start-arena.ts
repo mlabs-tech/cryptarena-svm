@@ -38,7 +38,7 @@ function loadKeypair(filePath: string): Keypair {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
-const CMC_API_KEY = "ef3cc5e80cc848ceba20b3c7cba60d5d";
+const CMC_API_KEY = process.env.CMC_API_KEY || "";
 
 const ARENA_STATUS: { [key: number]: string } = {
   0: "Uninitialized", 1: "Waiting", 2: "Ready", 3: "Active",

@@ -24,7 +24,7 @@ import https from "https";
 // CONFIGURATION
 // ============================================================================
 
-const CMC_API_KEY = "ef3cc5e80cc848ceba20b3c7cba60d5d";
+const CMC_API_KEY = process.env.CMC_API_KEY || "";
 const ASSET_NAMES = ["SOL", "TRUMP", "PUMP", "BONK", "JUP", "PENGU", "PYTH", "HNT", "FARTCOIN", "RAY", "JTO", "KMNO", "MET", "W"];
 
 // ============================================================================

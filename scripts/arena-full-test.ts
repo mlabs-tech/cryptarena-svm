@@ -17,7 +17,7 @@ import * as path from "path";
 import https from "https";
 
 // CoinMarketCap API
-const CMC_API_KEY = "ef3cc5e80cc848ceba20b3c7cba60d5d";
+const CMC_API_KEY = process.env.CMC_API_KEY || "";
 
 // Asset configuration
 const ASSETS = [
