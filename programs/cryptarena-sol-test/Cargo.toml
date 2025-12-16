@@ -1,0 +1,22 @@
+[package]
+name = "cryptarena-sol-test"
+version = "0.1.0"
+description = "Cryptarena SOL-based Arena Program (Test)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cryptarena_sol_test"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = ["init-if-needed"]
+idl-build = ["anchor-lang/idl-build"]
+init-if-needed = ["anchor-lang/init-if-needed"]
+
+[dependencies]
+anchor-lang = "0.32.1"
+

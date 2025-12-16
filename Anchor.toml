@@ -10,12 +10,14 @@ cryptarena_svm = "GjiVESbCveUyk2c1zqbFCzPnuficii3L5ZJHgYHMRhg6"
 cryptarena_faucet = "9ZaAhicfWbLmdJUzXk2ZT1o5CTdaW6VE8mF9sju15D5E"
 cryptarena_svm_test = "2LsREShXRB5GMera37czrEKwe5xt9FUnKAjwpW183ce9"
 cryptarena_sol = "GX4gVWUtVgq6XxL8oHYy6psoN9KFdJhwnds2T3NHe5na"
+cryptarena_sol_test = "J1HvjpKh1tUQQFJ3Fm5ZM7h4GSrvivdWTwzQ3UALfT9T"
 
 [programs.devnet]
 cryptarena_svm = "GjiVESbCveUyk2c1zqbFCzPnuficii3L5ZJHgYHMRhg6"
 cryptarena_faucet = "9ZaAhicfWbLmdJUzXk2ZT1o5CTdaW6VE8mF9sju15D5E"
 cryptarena_svm_test = "2LsREShXRB5GMera37czrEKwe5xt9FUnKAjwpW183ce9"
 cryptarena_sol = "GX4gVWUtVgq6XxL8oHYy6psoN9KFdJhwnds2T3NHe5na"
+cryptarena_sol_test = "J1HvjpKh1tUQQFJ3Fm5ZM7h4GSrvivdWTwzQ3UALfT9T"
 
 [registry]
 url = "https://api.apr.dev"
